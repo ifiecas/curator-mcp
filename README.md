@@ -25,10 +25,26 @@ Container Apps.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    Dev([Developer]) -->|git push main| GH[GitHub Actions]
+
+    subgraph Azure["Azure &middot; rg-curator"]
+        direction LR
+        ACR[("Container Registry<br/><i>ABAC mode</i>")]
+        APP["Container App<br/>HTTPS &middot; always-warm"]
+        ACR -->|"pull via<br/>managed identity"| APP
+    end
+
+    GH -->|"build &amp; push<br/>(SP AAD token)"| ACR
+    APP -->|"serves /mcp"| CS["Copilot Studio<br/>agent"]
+
+    TF[/"Terraform<br/>infra as code"/] -. provisions .-> Azure
 ```
-GitHub Actions ──build & push──▶ Azure Container Registry ──pull (managed identity)──▶ Azure Container Apps
-                                        (ABAC mode)                                    (HTTPS, always-warm)
-```
+
+**Flow:** a push to `main` triggers GitHub Actions, which builds the image and pushes it to the
+registry; the Container App pulls that image via a managed identity and serves the MCP endpoint over
+HTTPS, which the Copilot Studio agent calls. Terraform declares the same Azure resources.
 
 - **Server:** `curator_mcp_server.py` — FastMCP streamable-HTTP app, MCP endpoint at `/mcp` on port 8000.
 - **CI/CD:** `.github/workflows/deploy-azure.yml` — builds the image, pushes to ACR with the workflow
