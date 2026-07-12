@@ -1,0 +1,84 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: rg-curator
+  REGISTRY_NAME: curatorregistry
+  IMAGE_NAME: curator-mcp
+  APP_NAME: curator-mcp
+  ACA_ENV: curator-env
+  IDENTITY_NAME: curator-identity
+  LOCATION: australiaeast
+  TARGET_PORT: "8000"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Push with the CI service principal's own AAD token (it holds the
+      # "Container Registry Repository Writer" role). No admin passwords.
+      - name: Build and push image
+        run: |
+          LOGIN_SERVER=$(az acr show -n "$REGISTRY_NAME" --query loginServer -o tsv)
+          az acr login -n "$REGISTRY_NAME"
+
+          docker build \
+            -t "$LOGIN_SERVER/$IMAGE_NAME:${{ github.sha }}" \
+            -t "$LOGIN_SERVER/$IMAGE_NAME:latest" \
+            .
+          docker push "$LOGIN_SERVER/$IMAGE_NAME:${{ github.sha }}"
+          docker push "$LOGIN_SERVER/$IMAGE_NAME:latest"
+
+      # The Container App pulls from ACR using the curator-identity managed
+      # identity ("Container Registry Repository Reader"). No admin passwords.
+      - name: Deploy to Azure Container Apps
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+
+          LOGIN_SERVER=$(az acr show -n "$REGISTRY_NAME" --query loginServer -o tsv)
+          IDENTITY_ID=$(az identity show -g "$RESOURCE_GROUP" -n "$IDENTITY_NAME" --query id -o tsv)
+          IMAGE="$LOGIN_SERVER/$IMAGE_NAME:${{ github.sha }}"
+
+          # Create the Container Apps environment once (idempotent guard).
+          az containerapp env show -g "$RESOURCE_GROUP" -n "$ACA_ENV" -o none 2>/dev/null \
+            || az containerapp env create -g "$RESOURCE_GROUP" -n "$ACA_ENV" --location "$LOCATION"
+
+          if az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" -o none 2>/dev/null; then
+            echo "Updating existing app -> $IMAGE"
+            az containerapp identity assign -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+              --user-assigned "$IDENTITY_ID"
+            az containerapp registry set -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+              --server "$LOGIN_SERVER" --identity "$IDENTITY_ID"
+            az containerapp update -g "$RESOURCE_GROUP" -n "$APP_NAME" --image "$IMAGE"
+          else
+            echo "Creating app -> $IMAGE"
+            az containerapp create -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+              --environment "$ACA_ENV" \
+              --image "$IMAGE" \
+              --target-port "$TARGET_PORT" \
+              --ingress external \
+              --user-assigned "$IDENTITY_ID" \
+              --registry-server "$LOGIN_SERVER" \
+              --registry-identity "$IDENTITY_ID" \
+              --cpu 0.5 --memory 1.0Gi \
+              --min-replicas 0 --max-replicas 1
+          fi
+
+      - name: Show endpoint
+        run: |
+          FQDN=$(az containerapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "MCP endpoint: https://$FQDN/mcp"
