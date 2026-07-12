@@ -2,7 +2,6 @@
 
 > An MCP server that turns the Museums Victoria Collections API (1.15M+ records) into natural-language discovery tools for MCP clients such as Copilot Studio.
 
-![Status](https://img.shields.io/badge/status-production-green)
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
