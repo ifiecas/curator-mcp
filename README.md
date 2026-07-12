@@ -63,6 +63,26 @@ and rolls the Container App to the new build. The workflow needs one repository 
 
 To provision the underlying infrastructure declaratively, use the Terraform in `infra/terraform/`.
 
+## Data source & acknowledgement
+
+This project is built on the **[Museums Victoria Collections API](https://collections.museumsvictoria.com.au/developers)**
+(`https://collections.museumsvictoria.com.au/api`) and would not exist without it. All collection
+data — specimens, items, articles, and species — is provided by Museums Victoria. Huge thanks to
+Museums Victoria for making this data openly available.
+
+Please note when using the data:
+
+- **Licensing is per-record.** Individual records carry their own licence (commonly
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), Public Domain Mark, or
+  [CC0](https://creativecommons.org/publicdomain/zero/1.0/)) — check each record's `licence` and
+  `rightsStatement` fields and attribute accordingly.
+- **A `User-Agent` header is required** on every API request; this server sends one.
+- **Some records contain culturally sensitive content.** Handle Aboriginal and Torres Strait
+  Islander cultural material with appropriate respect.
+
+This project is not affiliated with or endorsed by Museums Victoria.
+
 ## License
 
-MIT
+MIT — see the note above; the museum **data** is licensed per-record by Museums Victoria and is not
+covered by this repository's licence.
