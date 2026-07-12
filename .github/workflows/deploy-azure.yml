@@ -74,7 +74,7 @@ jobs:
               --registry-server "$LOGIN_SERVER" \
               --registry-identity "$IDENTITY_ID" \
               --cpu 0.5 --memory 1.0Gi \
-              --min-replicas 0 --max-replicas 1
+              --min-replicas 1 --max-replicas 1
           fi
 
       - name: Show endpoint

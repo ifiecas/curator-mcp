@@ -28,7 +28,7 @@ Container Apps.
 
 ```
 GitHub Actions ──build & push──▶ Azure Container Registry ──pull (managed identity)──▶ Azure Container Apps
-                                        (ABAC mode)                                    (HTTPS, scale-to-zero)
+                                        (ABAC mode)                                    (HTTPS, always-warm)
 ```
 
 - **Server:** `curator_mcp_server.py` — FastMCP streamable-HTTP app, MCP endpoint at `/mcp` on port 8000.
